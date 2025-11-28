@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Legend of the Golden Tagine: Darija Mix</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #111;
+            --border-color: #FFF;
+            --text-color: #FFF;
+            --heart-color: #FF4040;
+            --mercy-color: #FFFF00;
+            --hp-bar-bg: #550000;
+            --hp-bar-fill: #FFFF00;
+            --meter-fill: #00FFFF;
+            --act-color: #6495ED;
+            --item-color: #32CD32;
+            --fight-color: #FFA500;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'VT323', monospace;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* CRT Scanline & Flicker */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker { 0% { opacity: 0.95; } 100% { opacity: 1; } }
+
+        .game-container {
+            width: 800px;
+            height: 800px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            border: 4px solid #FFF;
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- VISUAL AREA (Top) --- */
+        .visual-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            position: relative;
+            border: 2px solid white;
+            background-color: #000;
+            overflow: hidden; 
+            min-height: 250px; 
+        }
+
+        .enemy-sprite {
+            font-size: 24px;
+            white-space: pre;
+            text-align: center;
+            line-height: 22px;
+            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+            z-index: 5;
+        }
+
+        /* Story Text Overlay for Intro */
+        .story-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px;
+            box-sizing: border-box;
+            z-index: 50;
+            display: none;
+        }
+
+        @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+        /* JUICE: Damage Numbers */
+        .damage-text {
+            position: absolute;
+            font-size: 48px;
+            font-weight: bold;
+            z-index: 20;
+            text-shadow: 3px 3px 0px #000;
+            pointer-events: none;
+        }
+
+        /* JUICE: Particles */
+        .particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #FFF;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        /* --- HUD --- */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 26px;
+            margin-bottom: 10px;
+            padding: 0 10px;
+            color: #FFF;
+            text-shadow: 2px 2px #000;
+        }
+
+        .hp-container { display: flex; align-items: center; gap: 15px; }
+        .bar-wrapper { display: flex; flex-direction: column; gap: 2px; }
+
+        .hp-bar {
+            width: 150px; height: 20px;
+            background-color: var(--hp-bar-bg);
+            border: 2px solid white;
+            position: relative;
+        }
+
+        .hp-fill {
+            width: 100%; height: 100%;
+            background-color: var(--hp-bar-fill);
+            transition: width 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        .tp-bar {
+            width: 150px; height: 8px;
+            background-color: #003333;
+            border: 1px solid #555;
+            margin-top: 2px;
+        }
+
+        .tp-fill {
+            width: 0%; height: 100%;
+            background-color: var(--meter-fill);
+            transition: width 0.3s;
+        }
+
+        /* --- DIALOGUE BOX (Bottom) --- */
+        .dialogue-box {
+            border: 4px solid var(--border-color);
+            height: 350px;
+            padding: 20px;
+            font-size: 30px;
+            line-height: 1.4;
+            position: relative;
+            background: #000;
+            flex-shrink: 0;
+        }
+
+        .text-content {
+            white-space: pre-wrap;
+            margin-bottom: 10px;
+            min-height: 50px;
+        }
+
+        /* --- CHOICE GRID --- */
+        .choice-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 5px;
+        }
+
+        .choice-btn {
+            border: 2px solid transparent;
+            color: #888;
+            background: none;
+            padding: 5px 10px;
+            font-family: inherit;
+            font-size: 30px;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            text-transform: uppercase;
+            transition: transform 0.1s, color 0.1s;
+        }
+
+        .choice-btn:hover {
+            color: #FFF;
+            border: 2px solid #FFF;
+            transform: scale(1.02);
+            background-color: #111;
+        }
+
+        .choice-btn .soul-icon {
+            opacity: 0;
+            color: var(--heart-color);
+            margin-right: 15px;
+            font-size: 24px;
+        }
+
+        .choice-btn:hover .soul-icon { opacity: 1; }
+
+        /* Classes */
+        .action-fight { color: var(--fight-color); }
+        .action-act { color: var(--act-color); }
+        .action-item { color: var(--item-color); }
+        .action-mercy { color: var(--mercy-color); }
+        .action-special { color: #FF00FF; text-shadow: 0 0 5px #FF00FF; animation: pulse 1s infinite; }
+
+        @keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
+
+        /* Effects */
+        .shake-small { animation: shake-s 0.2s; }
+        .shake-med { animation: shake-m 0.4s; }
+        .shake-big { animation: shake-b 0.6s; }
+        @keyframes shake-s { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } 100% { transform: translate(0,0); } }
+        @keyframes shake-m { 0% { transform: translate(5px, 5px); } 25% { transform: translate(-5px, -5px); } 50% { transform: translate(5px, -5px); } 75% { transform: translate(-5px, 5px); } 100% { transform: translate(0,0); } }
+        @keyframes shake-b { 0% { transform: translate(10px, 10px); } 20% { transform: translate(-10px, -10px); } 40% { transform: translate(10px, -10px); } 60% { transform: translate(-10px, 10px); } 80% { transform: translate(5px, -5px); } 100% { transform: translate(0,0); } }
+
+        .flash-red { animation: flashRed 0.2s; }
+        .flash-white { animation: flashWhite 0.1s; }
+        @keyframes flashRed { 0% { background-color: rgba(255,0,0,0.5); } 100% { background-color: transparent; } }
+        @keyframes flashWhite { 0% { background-color: white; } 100% { background-color: black; } }
+
+        .yellow-text { color: var(--mercy-color) !important; text-shadow: 0 0 5px var(--mercy-color); }
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container" class="game-container">
+    
+    <div class="visual-area" id="visual-area">
+        <div id="location-name" style="position:absolute; top:10px; left:10px; font-size: 20px; color:#888;"></div>
+        <div id="enemy-sprite" class="enemy-sprite"></div>
+        <div id="story-overlay" class="story-overlay"></div>
+    </div>
+
+    <!-- HUD -->
+    <div class="hud">
+        <div class="name">YOU</div>
+        <div class="hp-container">
+            <span>LV <span id="lvl-text">1</span></span>
+            <div class="bar-wrapper">
+                <div class="hp-bar"><div id="hp-fill" class="hp-fill"></div></div>
+                <div class="tp-bar"><div id="tp-fill" class="tp-fill"></div></div>
+            </div>
+            <div style="font-size: 0.8em;">
+                <span id="hp-text">30/30</span> HP<br>
+                <span id="tp-text">0</span>% TP
+            </div>
+        </div>
+        <div class="stats-text" id="money-text">50 DH</div>
+    </div>
+
+    <!-- Dialogue Box -->
+    <div class="dialogue-box" id="dialogue-box">
+        <div id="text-content" class="text-content"></div>
+        <div id="next-indicator" class="next-indicator">*</div>
+        
+        <div id="choice-container" class="choice-grid hidden">
+            <!-- Choices -->
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- JUICE ENGINE ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    const FX = {
+        playTone: (freq, type, dur, vol=0.1, slide=0) => {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            if(slide !== 0) osc.frequency.linearRampToValueAtTime(freq + slide, audioCtx.currentTime + dur);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + dur);
+        },
+        noise: (dur) => {
+             const bufferSize = audioCtx.sampleRate * dur;
+             const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+             const data = buffer.getChannelData(0);
+             for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+             const noise = audioCtx.createBufferSource();
+             noise.buffer = buffer;
+             const gain = audioCtx.createGain();
+             gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+             noise.connect(gain);
+             gain.connect(audioCtx.destination);
+             noise.start();
+        },
+        shake: (intensity) => {
+            const el = document.getElementById('game-container');
+            el.className = 'game-container'; 
+            void el.offsetWidth;
+            if(intensity === 'small') el.classList.add('shake-small');
+            if(intensity === 'med') el.classList.add('shake-med');
+            if(intensity === 'big') el.classList.add('shake-big');
+        },
+        flash: (color) => {
+            const el = document.getElementById('visual-area');
+            el.style.animation = 'none';
+            void el.offsetWidth;
+            if(color === 'red') el.style.animation = 'flashRed 0.2s';
+            if(color === 'white') el.style.animation = 'flashWhite 0.1s';
+        },
+        particles: (x, y, color, count=10) => {
+            const container = document.getElementById('visual-area');
+            const rect = container.getBoundingClientRect();
+            let originX = rect.width / 2;
+            let originY = rect.height / 2;
+
+            for(let i=0; i<count; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.backgroundColor = color;
+                p.style.left = originX + 'px';
+                p.style.top = originY + 'px';
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                const vx = Math.cos(angle) * speed;
+                const vy = Math.sin(angle) * speed;
+                container.appendChild(p);
+
+                let opacity = 1;
+                let posX = originX;
+                let posY = originY;
+
+                const anim = setInterval(() => {
+                    posX += vx;
+                    posY += vy;
+                    opacity -= 0.05;
+                    p.style.left = posX + 'px';
+                    p.style.top = posY + 'px';
+                    p.style.opacity = opacity;
+                    if(opacity <= 0) { clearInterval(anim); p.remove(); }
+                }, 16);
+            }
+        },
+        damageNumber: (amount, type='dmg') => {
+            const el = document.createElement('div');
+            el.className = 'damage-text';
+            el.innerText = amount;
+            el.style.color = type === 'heal' ? '#00FF00' : '#FF0000';
+            if(type === 'crit') { el.style.color = '#FFD700'; el.style.fontSize = '60px'; el.innerText += "!"; }
+            el.style.left = '50%';
+            el.style.top = '50%';
+            document.getElementById('visual-area').appendChild(el);
+            let vy = -5;
+            let vx = (Math.random() - 0.5) * 5;
+            let opacity = 1;
+            let top = 50;
+            let left = 50;
+            const anim = setInterval(() => {
+                vy += 0.5; top += vy; left += vx; opacity -= 0.02;
+                el.style.top = top + '%'; el.style.left = left + '%'; el.style.opacity = opacity;
+                if(opacity <= 0) { clearInterval(anim); el.remove(); }
+            }, 16);
+        }
+    };
+
+    const Sounds = {
+        speak: () => FX.playTone(150 + Math.random()*50, 'square', 0.05, 0.05),
+        select: () => FX.playTone(400, 'sine', 0.05, 0.05),
+        confirm: () => FX.playTone(800, 'square', 0.1, 0.1),
+        hit: () => { FX.playTone(100, 'sawtooth', 0.1, 0.2, -50); FX.noise(0.1); },
+        crit: () => { FX.playTone(150, 'square', 0.2, 0.3, -50); FX.noise(0.2); },
+        heal: () => { FX.playTone(400, 'sine', 0.1, 0.1); setTimeout(()=>FX.playTone(600, 'sine', 0.1, 0.1), 100); setTimeout(()=>FX.playTone(800, 'sine', 0.4, 0.1), 200); },
+        charge: () => FX.playTone(200, 'triangle', 0.5, 0.1, 200),
+        win: () => { FX.playTone(523, 'square', 0.1); setTimeout(()=>FX.playTone(659, 'square', 0.1), 100); setTimeout(()=>FX.playTone(783, 'square', 0.3), 200); }
+    };
+
+    // --- ASSETS ---
+    const Sprites = {
+        intro: `
+   THE YEAR 202X
+   
+  THE GOLDEN TAGINE
+     HAS FADED...
+     
+   CHAOS REIGNS.
+        `,
+        derb: `
+      __  __  __
+     /  \\/  \\/  \\
+    | []  []  [] |  DERB
+   _|____________|_ HUB
+  /                \\
+ [HOME] [SHOP] [CAFE]
+        `,
+        medina: `
+    _   _   _   _
+   |_| |_| |_| |_|
+   | | | | | | | |
+  _|_|_|_|_|_|_|_|_
+  OLD MEDINA MAZE
+        `,
+        roofs: `
+      T      Y
+     /|\\    /|\\
+    /_|_\\  /_|_\\
+   [_____][_____]
+    ROOFTOPS
+        `,
+        hanout: `
+   __________________
+  |  HANOUT "SMILE"  |
+  | [R] [M] [P] [H]  |
+  |__________________|
+      |  ( ^_^ ) |
+        `,
+        cafe: `
+   ( (  ) )
+    ) )  )  CAFE
+  _......._ NOUS-NOSS
+ |         | WI-FI
+ |_________| FREE
+        `,
+        hammam: `
+     . . . .
+    . . . . .
+   ___________
+  |  HAMMAM   |
+  |   HOT!!   |
+  |___________|
+        `,
+        bouzebbal: `
+     /////
+    ( o o )
+    (  -  )
+    /|   |\\
+   BOUZEBBAL
+        `,
+        thief: `
+     _____
+    [_____] <-- Cap
+    ( > < )
+    /|___|\\
+   MOUL CASQUETTE
+        `,
+        drone: `
+      _|_
+    -( o )-  < BZZT
+     /   \\
+    TBERGUIG DRONE
+        `,
+        guide: `
+    ( $ $ )
+    /  |  \\
+   FAKE GUIDE
+        `,
+        butcher: `
+      ___
+     {O_O}
+    /|___|\\
+   / /   \\ \\
+    MOUL L'GUZZAR
+        `
+    };
+
+    const Items = {
+        raibi: { name: "Raibi", cost: 10, heal: 20, desc: "Pomegranate Power." },
+        merendina: { name: "Merendina", cost: 15, heal: 35, desc: "Classic sponge cake." },
+        poms: { name: "Poms", cost: 20, heal: 50, desc: "Apple soda." },
+        tide: { name: "Tide Packet", cost: 40, dmg: 25, desc: "Throw for DMG." }
+    };
+
+    // --- GAME STATE ---
+    let state = {
+        hp: 30, maxHp: 30,
+        money: 50,
+        tp: 0,
+        lvl: 1, exp: 0,
+        inventory: ['raibi'],
+        location: 'intro',
+        quest: {
+            started: false,
+            hasSpices: false,
+            hasVeggies: false,
+            hasMeat: false
+        },
+        flags: { butcherUnlocked: false, hacked: false }
+    };
+
+    // --- ENGINE ---
+    let typeInterval;
+    
+    function typeText(text, callback) {
+        const display = document.getElementById('text-content');
+        const choices = document.getElementById('choice-container');
+        
+        clearInterval(typeInterval);
+        choices.classList.add('hidden');
+        display.innerHTML = "";
+        
+        let i = 0;
+        typeInterval = setInterval(() => {
+            if(text[i] === '<') {
+                while(text[i] !== '>' && i < text.length) display.innerHTML += text[i++];
+                if(i < text.length) display.innerHTML += text[i++];
+            } else {
+                display.innerHTML += text[i];
+                if(i%2===0) Sounds.speak();
+                i++;
+            }
+            
+            if(i >= text.length) {
+                clearInterval(typeInterval);
+                if(callback) callback();
+            }
+        }, 25);
+    }
+
+    function updateHUD() {
+        const pct = (state.hp / state.maxHp) * 100;
+        document.getElementById('hp-fill').style.width = Math.max(0, pct) + "%";
+        document.getElementById('hp-text').innerText = `${state.hp}/${state.maxHp}`;
+        document.getElementById('tp-fill').style.width = state.tp + "%";
+        document.getElementById('tp-text').innerText = state.tp;
+        document.getElementById('money-text').innerText = state.money + " DH";
+        document.getElementById('lvl-text').innerText = state.lvl;
+        if(pct > 50) document.getElementById('hp-fill').style.backgroundColor = '#FFFF00';
+        else document.getElementById('hp-fill').style.backgroundColor = '#FF0000';
+    }
+
+    function showChoices(options) {
+        const container = document.getElementById('choice-container');
+        container.classList.remove('hidden');
+        container.innerHTML = '';
+        options.forEach(opt => {
+            const btn = document.createElement('div');
+            btn.className = 'choice-btn';
+            if(opt.class) btn.classList.add(opt.class);
+            btn.innerHTML = `<span class="soul-icon">❤</span> ${opt.text}`;
+            btn.onmouseenter = Sounds.select;
+            btn.onclick = () => { Sounds.confirm(); if(opt.action) opt.action(); };
+            container.appendChild(btn);
+        });
+    }
+
+    function showStory(text, callback) {
+        const overlay = document.getElementById('story-overlay');
+        overlay.style.display = 'flex';
+        overlay.innerText = text;
+        FX.flash('white');
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            if(callback) callback();
+        }, 3000);
+    }
+
+    // --- LOCATIONS ---
+    const Locs = {
+        intro: {
+            sprite: Sprites.intro,
+            enter: () => {
+                typeText("LONG AGO, THE FRIDAY LUNCH UNITED THE LAND.\nBUT THE INGREDIENTS VANISHED.\nONLY ONE HERO CAN SAVE LUNCH.", () => {
+                    setTimeout(() => showChoices([{text:"START GAME", action:()=>loadLoc('home_start')}]), 1000);
+                });
+            }
+        },
+        home_start: {
+            sprite: Sprites.derb,
+            enter: () => {
+                state.quest.started = true;
+                typeText("* MAMA: 'Ssir! The Pot is empty, my son!'\n* 'Go to the ROOFS for Vegetables.'\n* 'Go to the OLD MEDINA for Spices.'\n* 'Then go to the SOUK for Meat.'", () => {
+                    showChoices([{text:"I'm on it!", action:()=>loadLoc('derb')}]);
+                });
+            }
+        },
+        derb: {
+            sprite: Sprites.derb,
+            text: "* The Derb Hub.",
+            getOptions: () => {
+                const opts = [
+                    { text: "Old Medina (Spices)", action: () => loadLoc('medina') },
+                    { text: "The Roofs (Veggies)", action: () => loadLoc('roofs') },
+                    { text: "Souk (Moul L'Guzzar)", action: () => loadLoc('souk') },
+                    { text: "Hanout", action: () => loadLoc('hanout') },
+                    { text: "Hammam", action: () => loadLoc('hammam') },
+                    { text: "Cyber Cafe", action: () => loadLoc('cyber') },
+                    { text: "Home (Save)", action: () => loadLoc('home') },
+                    { text: "Support Dev 💖", action: () => window.open('https://www.paypal.com/paypalme/TYFALY', '_blank') }
+                ];
+                return opts;
+            }
+        },
+        home: {
+            sprite: Sprites.derb,
+            enter: () => {
+                state.hp = state.maxHp; state.tp = 0; updateHUD();
+                FX.particles(0,0,'#00FF00', 30); Sounds.heal();
+                let status = "* Ingredients:\n";
+                status += state.quest.hasSpices ? "- Spices [OK]\n" : "- Spices [MISSING]\n";
+                status += state.quest.hasVeggies ? "- Veggies [OK]\n" : "- Veggies [MISSING]\n";
+                status += state.quest.hasMeat ? "- Meat [OK]" : "- Meat [MISSING]";
+                typeText(`* You slept well.\n${status}`, () => setTimeout(() => showChoices([{text:"Wake Up", action:()=>loadLoc('derb')}]), 1000));
+            }
+        },
+        medina: {
+            sprite: Sprites.medina,
+            enter: () => {
+                if(state.quest.hasSpices) {
+                    typeText("* You already found the Spices here.", () => showChoices([{text:"Back", action:()=>loadLoc('derb')}]));
+                } else {
+                    typeText("* You are lost in the Old Medina.\n* A Fake Guide approaches!", () => {
+                        setTimeout(() => startBattle(Enemies.guide()), 1000);
+                    });
+                }
+            }
+        },
+        roofs: {
+            sprite: Sprites.roofs,
+            enter: () => {
+                if(state.quest.hasVeggies) {
+                    typeText("* The roofs are empty now.", () => showChoices([{text:"Back", action:()=>loadLoc('derb')}]));
+                } else {
+                    typeText("* You are jumping on rooftops.\n* A Tberguig Drone spots you!", () => {
+                        setTimeout(() => startBattle(Enemies.drone()), 1000);
+                    });
+                }
+            }
+        },
+        souk: {
+            sprite: Sprites.butcher,
+            enter: () => {
+                if(!state.quest.hasSpices || !state.quest.hasVeggies) {
+                    typeText("* MOUL L'GUZZAR: 'You are not ready, khoya!'\n* 'Bring Spices and Veggies first!'", () => {
+                        showChoices([{text:"Leave", action:()=>loadLoc('derb')}]);
+                    });
+                } else if (state.quest.hasMeat) {
+                    typeText("* You have everything! Go Home!", () => showChoices([{text:"Back", action:()=>loadLoc('derb')}]));
+                } else {
+                    typeText("* MOUL L'GUZZAR: 'So, you want the Legendary Meat?'\n* 'FIGHT ME!'", () => {
+                        setTimeout(() => startBattle(Enemies.butcher()), 2000);
+                    });
+                }
+            }
+        },
+        hanout: { sprite: Sprites.hanout, enter: () => shopMenu() },
+        hammam: { 
+            sprite: Sprites.hammam, 
+            enter: () => typeText("* Hammam (20 DH). Restore ALL.", () => showChoices([
+                {text:"Wash (20 DH)", action:()=>{
+                    if(state.money>=20){ state.money-=20; state.hp=state.maxHp+10; state.tp=100; updateHUD(); FX.flash('white'); Sounds.heal(); typeText("FRESH!", ()=>setTimeout(()=>loadLoc('derb'),1000)); }
+                    else typeText("Not enough flouss!");
+                }},
+                {text:"Leave", action:()=>loadLoc('derb')}
+            ]))
+        },
+        cyber: {
+            sprite: Sprites.cafe,
+            enter: () => {
+                typeText("* Cyber Cafe. Kids are playing CS 1.6.", () => {
+                    showChoices(Locs.cyber.getOptions());
+                });
+            },
+            getOptions: () => [
+                 { text: "Ask Hacker", action: () => {
+                    typeText("* HACKER: 'Dima L'7ekma is the cheat code.'", () => setTimeout(()=>showChoices(Locs.cyber.getOptions()), 3000));
+                 }},
+                { text: "Leave", action: () => loadLoc('derb') }
+            ]
+        }
+    };
+
+    function loadLoc(key) {
+        state.location = key;
+        const loc = Locs[key];
+        document.getElementById('enemy-sprite').innerText = loc.sprite || "";
+        document.getElementById('location-name').innerText = key.toUpperCase();
+        
+        if(loc.enter) loc.enter();
+        else if (loc.getOptions) {
+             typeText(loc.text, () => showChoices(loc.getOptions()));
+        } else {
+            typeText(loc.text, () => showChoices(loc.options));
+        }
+    }
+
+    // --- BATTLE ---
+    const Enemies = {
+        guide: () => ({ name: "Fake Guide", sprite: Sprites.guide, hp: 40, max: 40, atk: 5, gold: 40, xp: 30, drop: 'spices', acts: { check: "ATK 5 DEF 0. Smells like cheap perfume.", scam: "He tried to sell you a rug.", ignore: "You ignored him. SPAREABLE." }, desc: "A persistent street guide who won't leave you alone." }),
+        drone: () => ({ name: "Tberguig Drone", sprite: Sprites.drone, hp: 30, max: 30, atk: 4, gold: 30, xp: 20, drop: 'veggies', acts: { check: "ATK 4 DEF 0. Very annoying.", wave: "You waved. It recorded you.", throw_rock: "You hit the lens. SPAREABLE." }, desc: "A surveillance drone used by neighborhood gossips." }),
+        butcher: () => ({ name: "Moul L'Guzzar", sprite: Sprites.butcher, hp: 120, max: 120, atk: 10, gold: 500, xp: 500, drop: 'meat', acts: { check: "ATK 10 DEF 10. The meat master.", flirt: "He blushed.", scream: "He yelled louder." }, desc: "The legendary master of meat. Very intimidating." })
+    };
+
+    let battle = { enemy: null };
+
+    function startBattle(enemyObj) {
+        battle.enemy = { ...enemyObj }; 
+        document.getElementById('enemy-sprite').innerText = battle.enemy.sprite;
+        FX.shake('med'); FX.flash('white');
+        typeText(`* ${battle.enemy.name} blocks the way!`, () => setTimeout(playerTurn, 1000));
+    }
+
+    function playerTurn() {
+        updateHUD();
+        typeText(`* What will you do?`, () => {
+            let opts = [
+                { text: "FIGHT", class: "action-fight", action: fight },
+                { text: "ACT", class: "action-act", action: actMenu },
+                { text: "ITEM", class: "action-item", action: itemMenu },
+                { text: "MERCY", class: "action-mercy", action: mercy }
+            ];
+            if(state.tp >= 100) opts.push({ text: "ULTIMATE SANDALA", class: "action-special", action: specialAttack });
+            showChoices(opts);
+        });
+    }
+
+    function fight() {
+        let crit = Math.random() > 0.8;
+        let dmg = Math.floor((state.lvl * 5) + (Math.random() * 5));
+        if(crit) dmg *= 2;
+        battle.enemy.hp -= dmg;
+        state.tp = Math.min(100, state.tp + 15);
+        FX.shake(crit ? 'big' : 'small');
+        if(crit) FX.flash('red');
+        FX.particles(0,0, '#FF0000', crit ? 30 : 10);
+        FX.damageNumber(dmg, crit ? 'crit' : 'dmg');
+        crit ? Sounds.crit() : Sounds.hit();
+        setTimeout(() => {
+            typeText(`* You hit for ${dmg} damage!`, () => {
+                if(battle.enemy.hp <= 0) win();
+                else setTimeout(enemyTurn, 1000);
+            });
+        }, 100); 
+    }
+
+    function specialAttack() {
+        state.tp = 0; battle.enemy.hp -= 60;
+        FX.flash('white'); FX.shake('big'); FX.particles(0,0, '#00FFFF', 50); FX.damageNumber(60, 'crit'); Sounds.crit();
+        typeText("* ULTIMATE SANDALA TECHNIQUE!!!", () => {
+            if(battle.enemy.hp <= 0) win(); else setTimeout(enemyTurn, 1500);
+        });
+    }
+
+    function actMenu() {
+        const acts = Object.keys(battle.enemy.acts).map(k => ({
+            text: k.toUpperCase(),
+            action: () => {
+                const actionText = battle.enemy.acts[k];
+                typeText(`* ${actionText}`, () => { 
+                    state.tp+=10; 
+                    // Simple logic for SPAREABLE state
+                    if(actionText.includes("SPAREABLE.")) {
+                        battle.enemy.spareable = true;
+                    }
+                    setTimeout(enemyTurn, 1500); 
+                });
+            }
+        }));
+        acts.push({text:"Back", action: playerTurn});
+        showChoices(acts);
+    }
+
+    function itemMenu() {
+        if(state.inventory.length === 0) { typeText("* Inventory is empty!", ()=>setTimeout(playerTurn,1000)); return; }
+        const opts = state.inventory.map((k, i) => ({
+            text: Items[k].name,
+            action: () => {
+                const item = Items[k];
+                state.inventory.splice(i, 1);
+                if(item.heal) { 
+                    state.hp = Math.min(state.maxHp, state.hp + item.heal); 
+                    FX.damageNumber(item.heal, 'heal'); Sounds.heal(); 
+                    typeText(`* Used ${item.name}. Recovered HP.`); 
+                }
+                if(item.dmg) { 
+                    battle.enemy.hp -= item.dmg; 
+                    FX.damageNumber(item.dmg, 'dmg'); Sounds.hit(); 
+                    typeText(`* Threw ${item.name}!`); 
+                }
+                setTimeout(() => { if(battle.enemy.hp <= 0) win(); else enemyTurn(); }, 1500);
+            }
+        }));
+        opts.push({text:"Back", action: playerTurn});
+        showChoices(opts);
+    }
+
+    function mercy() { 
+        if(battle.enemy.spareable) {
+            typeText("* Enemy spared!", () => win(false));
+        } else {
+            typeText("* Enemy is not ready to be spared.", () => setTimeout(enemyTurn, 1500));
+        }
+    }
+
+    function enemyTurn() {
+        const dmg = Math.max(1, battle.enemy.atk - Math.floor(state.lvl / 2));
+        state.hp -= dmg; state.tp += 5;
+        FX.shake('med'); FX.flash('red'); Sounds.hit(); updateHUD();
+        typeText(`* ${battle.enemy.name} attacks! -${dmg} HP`, () => {
+            if(state.hp <= 0) gameOver(); else playerTurn();
+        });
+    }
+
+    function win(kill=true) {
+        Sounds.win();
+        let msg = kill ? `* You won! +${battle.enemy.gold} DH.` : `* Spared! +${Math.floor(battle.enemy.gold/2)} DH.`;
+        state.money += kill ? battle.enemy.gold : Math.floor(battle.enemy.gold/2);
+        
+        // Quest Item Logic
+        if(battle.enemy.drop === 'spices') { state.quest.hasSpices = true; msg += "\n* FOUND RAS EL HANOUT!"; }
+        if(battle.enemy.drop === 'veggies') { state.quest.hasVeggies = true; msg += "\n* FOUND LEGENDARY CARROTS!"; }
+        if(battle.enemy.drop === 'meat') { 
+            state.quest.hasMeat = true; 
+            typeText("* YOU DEFEATED MOUL L'GUZZAR!\n* YOU GOT THE MEAT!", () => setTimeout(gameEnding, 3000));
+            return;
+        }
+
+        typeText(msg, () => setTimeout(()=>loadLoc('derb'), 2000));
+    }
+
+    function gameEnding() {
+        showStory("THE TAGINE IS COMPLETE.\nPEACE RETURNS TO THE DERB.\nYOU ARE A HERO.", () => {
+             loadLoc('home');
+        });
+    }
+
+    function gameOver() { FX.shake('big'); typeText("* GAME OVER...", () => showChoices([{text:"Try Again", action:()=>location.reload()}])); }
+
+    function shopMenu() {
+        typeText("* Moul Hanout: 'Marhba! Ach bghiti a weldi?'", () => {
+            const opts = Object.keys(Items).map(k => {
+                const i = Items[k];
+                return { text: `${i.name} (${i.cost} DH)`, action: () => buy(k) };
+            });
+            opts.push({ text: "Leave", action: () => loadLoc('derb') });
+            showChoices(opts);
+        });
+    }
+
+    function buy(key) {
+        const item = Items[key];
+        if(state.money >= item.cost) {
+            state.money -= item.cost; state.inventory.push(key); updateHUD(); FX.playTone(1000, 'sine', 0.1);
+            typeText(`* Bought ${item.name}.`, () => setTimeout(shopMenu, 500));
+        } else { typeText("* Not enough flouss!", () => setTimeout(shopMenu, 500)); }
+    }
+
+    // --- INIT ---
+    updateHUD();
+    loadLoc('intro');
+
+</script>
+</body>
+</html>
